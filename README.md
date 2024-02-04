@@ -18,6 +18,7 @@ List all planned tasks with the command **list**.
 
 List today's planned tasks with the command **today**.
 
+Bot is based on the aiogram python package using webhooks.
 # Bot demo:
 
 https://t.me/andrew_notifications_bot
@@ -26,5 +27,6 @@ https://t.me/andrew_notifications_bot
 
 1. Set Python environment, setup all the packages from requirements.txt
 2. Get a bot token from Bot father, put it into the token.txt file near the source files
+3. Generate SSL keys with the command ```openssl req -newkey rsa:2048 -sha256 -nodes -keyout tg_private.key -x509 -days 1000 -out tg_public.pem -subj "/C=AT/ST=Linz/CN=HOSTNAME"```, where HOSTNAME is your server's IP or domain name.
 3. Change webhooks server parameters inside the shedule_bot.py code.
 4. run server with ```python shedule_bot.py```
