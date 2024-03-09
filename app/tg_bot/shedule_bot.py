@@ -15,16 +15,18 @@ from aiohttp import web
 
 from aiogram import Bot, Dispatcher, Router, types
 from aiogram.enums import ParseMode
-from aiogram.filters import CommandStart
-from aiogram.types import FSInputFile, Message
+from aiogram.filters import CommandStart, Command
+from aiogram.types import FSInputFile, Message, ContentType, KeyboardButton
 from aiogram.utils.markdown import hbold
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
+from aiogram.methods import SetMyDescription
+from aiogram import F
 
-from shedule_cron import add_cron_job, remove_cron_job, list_cron_jobs, list_today_jobs
+from app.adapters.shedule_cron import add_cron_job, remove_cron_job, list_cron_jobs, list_today_jobs
 
 
 # Bot token can be obtained via https://t.me/BotFather
-TOKEN_FILE = "token.txt"
+TOKEN_FILE = "config/token.txt"
 with open(TOKEN_FILE, 'r') as file:
     TOKEN = file.read()
 
@@ -43,8 +45,8 @@ WEBHOOK_SECRET = "my-secret"
 BASE_WEBHOOK_URL = "179.43.151.16"
 
 # Path to SSL certificate and private key for self-signed certificate.
-WEBHOOK_SSL_CERT = "tg_public.pem"
-WEBHOOK_SSL_PRIV = "tg_private.key"
+WEBHOOK_SSL_CERT = "config/tg_public.pem"
+WEBHOOK_SSL_PRIV = "config/tg_private.key"
 
 # Functionality-related definitions
 TIMEZONE_OFFSET = 1 # GMT+1 for Austria
@@ -69,7 +71,11 @@ List all planned tasks with the command {hbold("list")}.
 
 List today's planned tasks with the command {hbold("today")}.
 """
-# DB_FILE = "shedule_bot_db.yaml"
+
+GREETING_MSG_SHORT = """
+Hello, this is Tutor to Student interaction bot! 
+It will keep you on track with payment reminders, sheduling and probably more...
+"""
 
 # Logging
 logger = logging.getLogger()
@@ -82,11 +88,14 @@ logger.addHandler(fhandle)
 logger.addHandler(shandle)
 logger.setLevel(logging.INFO)
 
+
 def get_job_id() -> int:
     return round(time()*1000)
 
-# All handlers should be attached to the Router (or Dispatcher)
+
+# All aiogram handlers should be attached to the Router (or Dispatcher)
 router = Router()
+
 
 @router.message(CommandStart())
 async def command_start_handler(message: Message) -> None:
@@ -101,19 +110,20 @@ async def command_start_handler(message: Message) -> None:
     await message.answer(GREETING_MSG)
 
 
-# @router.message()
-# async def echo_handler(message: types.Message) -> None:
-#     """
-#     Handler will forward receive a message back to the sender
-
-#     By default, message handler will handle all message types (like text, photo, sticker etc.)
-#     """
-#     try:
-#         # Send a copy of the received message
-#         await message.send_copy(chat_id=message.chat.id)
-#     except TypeError:
-#         # But not all the types is supported to be copied so need to handle it
-#         await message.answer("Nice try!")
+@router.message(F.document)
+async def doc_handler(message: types.Message, bot:Bot) -> None:
+    document = message.document
+    logger.info("Received a file: " + document.file_name)
+    if document.file_name.endswith(".xlsx"):
+        file_id = document.file_id
+        file = await bot.get_file(file_id)
+        await bot.download_file(
+            file.file_path,
+            "received_xlsx/shedule_new.xlsx"
+        )
+    else:
+        logger.warning("Filetype is unsupported")
+        await message.answer("❌ Unsupported file format")
 
 
 @router.message()
@@ -261,6 +271,7 @@ async def new_message_handler(message: types.Message) -> None:
 
 
 
+
 async def on_startup(bot: Bot) -> None:
     # In case when you have a self-signed SSL certificate, you need to send the certificate
     # itself to Telegram servers for validation purposes
@@ -271,8 +282,11 @@ async def on_startup(bot: Bot) -> None:
         certificate=FSInputFile(WEBHOOK_SSL_CERT),
     )
 
+    await bot.set_my_description(GREETING_MSG_SHORT)
 
-def main() -> None:
+
+
+def run_tg_bot() -> None:
 
     # Dispatcher is a root router
     dp = Dispatcher()
@@ -311,4 +325,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, stream=sys.stdout)
-    main()
+    run_tg_bot()
