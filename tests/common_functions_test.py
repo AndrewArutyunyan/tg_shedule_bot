@@ -7,7 +7,7 @@ from datetime import datetime
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.adapters.db_connector import execute_query
-from app.common.utils import add_tutor, update_students_from_excel, update_student_contact
+from app.common.common_functions import *
 from app.common.models import Tutor, Student
 
 
@@ -17,6 +17,11 @@ class TestXlsParser(unittest.TestCase):
                     datefmt = '%m/%d/%Y %H:%M:%S', level = logging.INFO)
 
     def setUp(self) -> None:
+        # Store the current log level to restore it later
+        original_log_level = logging.getLogger().getEffectiveLevel()
+        # Set the log level to a higher level, e.g., WARNING or CRITICAL
+        logging.disable(logging.CRITICAL)
+
         self.tutor_contact_id = 252353213
         self.tutor_full_name = 'Tutor 2'
         self.tutor_phone_number = '23423523522'
@@ -38,6 +43,10 @@ class TestXlsParser(unittest.TestCase):
             str(self.student_full_name) + "', '" + \
             str(datetime.now()) + "');"
         execute_query(student_write_query, readonly=True)
+
+        # Restore the original log level after the tests
+        logging.disable(original_log_level)
+
         return super().setUp()
 
 
@@ -51,7 +60,7 @@ class TestXlsParser(unittest.TestCase):
         self.assertEqual(result, 0) 
     
     
-    def test_students_read(self):
+    def test_update_students_from_excel(self):
         """
         Read information from received_xlsx/shedule_new.xlsx file,
         process and query the DB.
@@ -63,7 +72,7 @@ class TestXlsParser(unittest.TestCase):
         self.assertIsNotNone(results)
 
 
-    def test_students_update(self):
+    def test_update_student_contact(self):
         """
         Try to insert contact information to a student in DB.
         Test passed if updating existing user returns 1 and non-existing user returns 0.
@@ -72,9 +81,32 @@ class TestXlsParser(unittest.TestCase):
         result = update_student_contact(self.student_unique_id, 235234234, '823942235232')
         self.assertEqual(result, 1)
 
-        result = update_student_contact('not_exists', 235234234, '823942235232')
+
+        # Store the current log level to restore it later
+        original_log_level = logging.getLogger().getEffectiveLevel()
+        # Set the log level to a higher level, e.g., WARNING or CRITICAL
+        logging.disable(logging.CRITICAL)
+        try:
+            result = update_student_contact('not_exists', 235234234, '823942235232')
+        except Exception as exp:
+            logger.exception(exp)
+        # Restore the original log level after the tests
+        logging.disable(original_log_level)
+
         self.assertEqual(result, 0)
         
+
+    def test_remove_outdated_students(self):
+        """
+        Delete records of all students from DB except of given ID list
+        Test passed if amount of records is equal to the length of test list
+        """
+        students = [Student(student_id=3, unique_id=self.student_unique_id, full_name=self.student_full_name)]
+        remove_outdated_students(students)
+        students_read_query = f"SELECT * FROM student;"
+        students_db = execute_query(students_read_query)
+        self.assertEqual(len(students_db), len(students))
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -17,4 +17,6 @@ class Student:
     full_name: str = None
     tutor: Tutor = None
     phone_number: str = None
+    payment_amount: float = None
+    payment_currency: float = None
 

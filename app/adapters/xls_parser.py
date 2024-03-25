@@ -12,7 +12,12 @@ def read_students_excel(book:str)->List[Student]:
     i = 42
     while id := sheet[f"N{i}"].value:
         student_name = sheet[f"O{i}"].value
-        students.append(Student(unique_id=id, full_name=student_name))
+        amount = sheet[f"R{i}"].value
+        currency = sheet[f"Q{i}"].value
+        students.append(Student(unique_id=id, 
+                                full_name=student_name,
+                                payment_amount=amount,
+                                payment_currency=currency))
         i += 1
     
     return students

@@ -24,7 +24,7 @@ from aiogram import F
 
 from app.adapters.shedule_cron import add_cron_job, remove_cron_job, list_cron_jobs, list_today_jobs
 from app.common.models import *
-from app.common.utils import *
+from app.common.common_functions import *
 
 # Bot token can be obtained via https://t.me/BotFather
 TOKEN_FILE = "config/token.txt"
@@ -165,6 +165,8 @@ async def doc_handler(message: types.Message, bot:Bot) -> None:
             await message.answer("The file is OK, but we couldn't read your profile from the database, error occured")
         else:
             students = update_students_from_excel("received_xlsx/shedule_new.xlsx", tutor)
+            remove_outdated_students(students)
+            update_notifications(tutor)
             if students is not None:
                 student_names = [s.unique_id for s in students]
                 await message.answer("✅ Successfully added the following students: \n\t- " + "\n\t- ".join(student_names))
