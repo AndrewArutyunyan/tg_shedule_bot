@@ -20,17 +20,15 @@ class TestXlsParser(unittest.TestCase):
         """
         conf_file = 'config/database.ini'
         config = load_config(conf_file)
-        results = execute_query(config, "SELECT 1;")
-        self.assertEqual(results, ["1"])
+        results = execute_query("SELECT 1;", config)
+        self.assertEqual(results, [(1,)])
 
     def test_sql_table_query(self):
         """
         Query the database from database.ini file and fetch all records from students table.
         Test if query will not fail
         """
-        conf_file = 'config/database.ini'
-        config = load_config(conf_file)
-        results = execute_query(config, "SELECT * from student;")
+        results = execute_query("SELECT * from student;")
         if results is not None:
             logging.info(f"Successfully read {len(results)} lines from the DB table student")
         self.assertIsNotNone(results, "SQL Read returned None")

@@ -1,20 +1,18 @@
-import xlwings as xw
+from openpyxl import load_workbook
 from ..common.models import Student
 from typing import List
+import warnings
 
 
-def get_students(book:str)->List:
-    sheet = xw.Book(book).sheets['Current_month']
+def read_students_excel(book:str)->List[Student]:
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        sheet = load_workbook(book, data_only=True)['Current_month']
     students = []
     i = 42
-    while student_id := sheet[f"N{i}"].value:
-        student_name = sheet[f"N{i}"].value
-        students.append(Student(student_id=student_id, name=student_name))
+    while id := sheet[f"N{i}"].value:
+        student_name = sheet[f"O{i}"].value
+        students.append(Student(unique_id=id, full_name=student_name))
         i += 1
     
     return students
-
-
-if __name__ == "__main__":
-    shedule = "received_xlsx/shedule_new.xlsx"
-    s = get_students(shedule)

@@ -1,5 +1,5 @@
 import os 
 
-from app.common.utils import parse_students
+from app.tg_bot.shedule_bot import run_tg_bot
 
-parse_students("received_xlsx/shedule_new.xlsx")
+run_tg_bot()

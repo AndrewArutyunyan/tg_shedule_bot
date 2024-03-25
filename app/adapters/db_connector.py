@@ -1,7 +1,12 @@
 import psycopg2
 from configparser import ConfigParser
 import logging
+import sys
+import os
 
+logger = logging.getLogger(__name__)
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 def load_config(filename, section='postgresql')->dict:
     parser = ConfigParser()
@@ -14,24 +19,33 @@ def load_config(filename, section='postgresql')->dict:
         for param in params:
             config[param[0]] = param[1]
     else:
-        raise Exception('Section {0} not found in the {1} file'.format(section, filename))
+        exc = Exception('Section {0} not found in the {1} file'.format(section, filename))
+        logger.exception(exc)
+        raise exc
 
     return config
 
 
-def execute_query(config, query):
+def execute_query(query, config=None, readonly=False):
     """ Run query on the PostgreSQL database server, return result """
     result = None
+    conf_file = 'config/database.ini'
+    if config is None:
+        try:
+            config = load_config(conf_file)
+        except (Exception) as error:
+            logger.exception("Error connecting to DB: ")
     try:
         # connecting to the PostgreSQL server
         with psycopg2.connect(**config) as conn:
-            logging.info('Connected to the PostgreSQL server.')
+            logger.debug('Connected to the PostgreSQL server.')
             cursor_obj = conn.cursor()
             cursor_obj.execute(query)
-            result = cursor_obj.fetchall()
-            logging.info("Result: ", "\n", result)
+            if not readonly:
+                result = cursor_obj.fetchall()
+            logger.debug(query)
 
     except (psycopg2.DatabaseError, Exception) as error:
-        logging.exception("Error in postgres SQL: ")
+        logger.exception("Error in postgres SQL: ")
 
     return result

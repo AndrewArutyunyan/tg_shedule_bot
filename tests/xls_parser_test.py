@@ -5,7 +5,7 @@ import logging
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.adapters.xls_parser import get_students
+from app.adapters.xls_parser import read_students_excel
 
 
 class TestXlsParser(unittest.TestCase):
@@ -19,7 +19,7 @@ class TestXlsParser(unittest.TestCase):
         Test if number of students if more then 0
         """
         shedule = os.path.abspath("received_xlsx/shedule_new.xlsx")
-        s = get_students(shedule)
+        s = read_students_excel(shedule)
         logging.info(f"Successfully read {len(s)} lines from the Excel table")
         self.assertGreater(len(s), 0)
 

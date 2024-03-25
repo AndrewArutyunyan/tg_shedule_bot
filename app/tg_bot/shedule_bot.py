@@ -16,14 +16,15 @@ from aiohttp import web
 from aiogram import Bot, Dispatcher, Router, types
 from aiogram.enums import ParseMode
 from aiogram.filters import CommandStart, Command
-from aiogram.types import FSInputFile, Message, ContentType, KeyboardButton
+from aiogram.types import FSInputFile, Message, ContentType, KeyboardButton, reply_keyboard_remove
 from aiogram.utils.markdown import hbold
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 from aiogram.methods import SetMyDescription
 from aiogram import F
 
 from app.adapters.shedule_cron import add_cron_job, remove_cron_job, list_cron_jobs, list_today_jobs
-
+from app.common.models import *
+from app.common.utils import *
 
 # Bot token can be obtained via https://t.me/BotFather
 TOKEN_FILE = "config/token.txt"
@@ -71,11 +72,11 @@ List all planned tasks with the command {hbold("list")}.
 
 List today's planned tasks with the command {hbold("today")}.
 """
-
 GREETING_MSG_SHORT = """
 Hello, this is Tutor to Student interaction bot! 
 It will keep you on track with payment reminders, sheduling and probably more...
 """
+STATE = "Start"
 
 # Logging
 logger = logging.getLogger()
@@ -102,12 +103,50 @@ async def command_start_handler(message: Message) -> None:
     """
     This handler receives messages with `/start` command
     """
-    # Most event objects have aliases for API methods that can be called in events' context
-    # For example if you want to answer to incoming message you can use `message.answer(...)` alias
-    # and the target chat will be passed to :ref:`aiogram.methods.send_message.SendMessage`
-    # method automatically or call API method directly via
-    # Bot instance: `bot.send_message(chat_id=message.chat.id, ...)`
-    await message.answer(GREETING_MSG)
+    kb = [
+        [types.KeyboardButton(text="Student")],
+        [types.KeyboardButton(text="Tutor")]
+    ]
+    keyboard = types.ReplyKeyboardMarkup(keyboard=kb)
+    await message.answer("Are you a student or a tutor?", 
+                         reply_markup=keyboard)
+
+
+@router.message(F.text == "Tutor")
+async def command_tutor_handler(message: Message) -> None:
+    """
+    This handler receives messages with answer `Tutor` to the question Are you a student or a tutor?
+    """
+    global STATE
+    tutor_name = message.from_user.full_name
+    tutor = Tutor(contact_id=message.from_user.id, full_name=tutor_name, phone_number=' ')
+    is_added = add_tutor(tutor)
+    if is_added == 0:
+        STATE = "Tutor"
+        await message.answer(f"Welcome back, {tutor_name}! Upload new students book", 
+                             reply_markup=reply_keyboard_remove.ReplyKeyboardRemove(remove_keyboard=True))
+    elif  is_added == 1:
+        STATE = "Tutor"
+        example_book = "received_xlsx/shedule_example.xlsx"
+        file = FSInputFile(example_book, filename="shedule_example.xlsx")
+        await message.answer_document(document=file, 
+                                      caption=f"Greetings, {tutor_name}! " + \
+                                        "Upload an Excel book with a shedule for the current month. Example attached", 
+                                        reply_markup=reply_keyboard_remove.ReplyKeyboardRemove(remove_keyboard=True))
+    else:
+        await message.answer(f"Error occured, sorry contact the support contact from the description", 
+                             reply_markup=reply_keyboard_remove.ReplyKeyboardRemove(remove_keyboard=True))
+
+
+@router.message(F.text == "Student")
+async def command_tutor_handler(message: Message) -> None:
+    """
+    This handler receives messages with answer `Student` to the question Are you a student or a tutor?
+    """
+    global STATE
+    STATE = "Waiting for unique_id"
+    await message.answer(f"Provide the unique ID from your tutor please", 
+                         reply_markup=reply_keyboard_remove.ReplyKeyboardRemove(remove_keyboard=True))    
 
 
 @router.message(F.document)
@@ -121,6 +160,15 @@ async def doc_handler(message: types.Message, bot:Bot) -> None:
             file.file_path,
             "received_xlsx/shedule_new.xlsx"
         )
+        tutor = get_tutor_by_contact_id(message.from_user.id)
+        if tutor is None:
+            await message.answer("The file is OK, but we couldn't read your profile from the database, error occured")
+        else:
+            students = update_students_from_excel("received_xlsx/shedule_new.xlsx", tutor)
+            if students is not None:
+                student_names = [s.unique_id for s in students]
+                await message.answer("✅ Successfully added the following students: \n\t- " + "\n\t- ".join(student_names))
+
     else:
         logger.warning("Filetype is unsupported")
         await message.answer("❌ Unsupported file format")
@@ -136,6 +184,23 @@ async def new_message_handler(message: types.Message) -> None:
     chat_id=message.chat.id
     user_id = message.from_user.id
     request = message.text
+    global STATE
+    if STATE == "Waiting for unique_id":
+        student_unique_id = message.text
+        student_contact_id = message.from_user.id
+        result = update_student_contact(unique_id=student_unique_id,
+                                        contact_id=student_contact_id,
+                                        phone_number=' ')
+        if result == 0:
+            await message.answer("❌ Such user was not found, please contact the tutor for the valid user_id")
+        elif result == 1:
+            await message.answer(f"✅ Welcome, {message.from_user.full_name}. I'll remind you about the next payment")
+        else:
+            await message.answer("❌ An error occured and the user was not found, please contact the tutor")
+        STATE = "User"
+        return 0
+    
+
     try:
         request_content = request.split(" ")
         if request_content[0].lower() == "schedule":
