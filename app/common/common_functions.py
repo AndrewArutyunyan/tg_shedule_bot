@@ -3,7 +3,8 @@ import logging
 from datetime import datetime
 
 from ..adapters.xls_parser import read_students_excel
-from ..adapters.db_connector import execute_query
+from ..adapters.db import execute_query
+from ..adapters.cron import *
 from .models import Student, Tutor
 
 logger = logging.getLogger(__name__)
@@ -18,12 +19,12 @@ def add_tutor(tutor:Tutor)->int:
                     1 - Successfully added new tutor
                     None - error occured
     """
-    tutor_read_query = f"SELECT tutor_id FROM tutor WHERE contact_id = {tutor.contact_id}"
+    tutor_read_query = f"SELECT tutor_id FROM tutor WHERE chat_id = {tutor.chat_id}"
     try:
         tutor_id = execute_query(tutor_read_query)
         if tutor_id is None or len(tutor_id) == 0:
-            tutor_write_query = "INSERT INTO tutor(contact_id, full_name, phone_number, added_at) VALUES (" + \
-                str(tutor.contact_id) + ", '" + \
+            tutor_write_query = "INSERT INTO tutor(chat_id, full_name, phone_number, added_at) VALUES (" + \
+                str(tutor.chat_id) + ", '" + \
                 str(tutor.full_name) + "', '" + \
                 str(tutor.phone_number) + "', '" + \
                 str(datetime.now()) + "');"
@@ -37,19 +38,19 @@ def add_tutor(tutor:Tutor)->int:
         return None
 
 
-def get_tutor_by_contact_id(contact_id:int)->Tutor:
+def get_tutor_by_chat_id(chat_id:int)->Tutor:
     """
     Read DB and return a Tutor object with the current information
     """
     try:
-        tutor_read_query = f"SELECT tutor_id, full_name, phone_number FROM tutor WHERE contact_id = {contact_id}"
+        tutor_read_query = f"SELECT tutor_id, full_name, phone_number FROM tutor WHERE chat_id = {chat_id}"
         tutor_db = execute_query(tutor_read_query)
         if tutor_db is None or len(tutor_db) == 0:
-            logger.error(f"Tutor with contact_id = {contact_id} was not found!")
+            logger.error(f"Tutor with chat_id = {chat_id} was not found!")
             return None
         else:
             tutor = Tutor(tutor_id=tutor_db[0][0],
-                          contact_id=contact_id,
+                          chat_id=chat_id,
                           full_name=tutor_db[0][1],
                           phone_number=tutor_db[0][2])
             return tutor
@@ -66,11 +67,11 @@ def update_students_from_excel(filename:str, tutor:Tutor)->List[Student]:
     #TODO: import lessons
     #TODO: isolate students by tutor_id, allow no updates of another tutor's students
     try:
-        tutor_read_query = f"SELECT tutor_id FROM tutor WHERE contact_id = {tutor.contact_id}"
+        tutor_read_query = f"SELECT tutor_id FROM tutor WHERE chat_id = {tutor.chat_id}"
         tutor_id = execute_query(tutor_read_query)
         if tutor_id is None or len(tutor_id) == 0:
-            tutor_write_query = "INSERT INTO tutor(contact_id, full_name, phone_number, added_at) VALUES (" + \
-                str(tutor.contact_id) + ", '" + \
+            tutor_write_query = "INSERT INTO tutor(chat_id, full_name, phone_number, added_at) VALUES (" + \
+                str(tutor.chat_id) + ", '" + \
                 str(tutor.full_name) + "', '" + \
                 str(tutor.phone_number) + "', '" + \
                 str(datetime.now()) + "');"
@@ -113,7 +114,7 @@ def update_students_from_excel(filename:str, tutor:Tutor)->List[Student]:
         return None
     
 
-def update_student_contact(unique_id:str, contact_id:int, phone_number:str)->int:
+def update_student_contact(unique_id:str, chat_id:int, phone_number:str)->int:
     """
     Insert contact information about student to the BD.
     Returns status: 0 - no such unique_id found in BD, nothing to update
@@ -128,8 +129,8 @@ def update_student_contact(unique_id:str, contact_id:int, phone_number:str)->int
             logger.warning('Wrong user ID provided, no such user in the BD')
             return 0
         else:
-            student_write_query = "UPDATE student SET contact_id = " + \
-                str(contact_id) + ", phone_number = '" + \
+            student_write_query = "UPDATE student SET chat_id = " + \
+                str(chat_id) + ", phone_number = '" + \
                 str(phone_number) + "' WHERE  unique_id = '" + \
                 str(unique_id) + "';"
             execute_query(student_write_query, readonly=True)
@@ -165,6 +166,11 @@ def remove_outdated_students(students:List[Student])->None:
 
 
 def plus_month(dt:datetime, mon:int)->datetime:
+    """
+    Adds a calendar month to the given date
+    Code from here:
+        https://github.com/zulip/finbot/blob/master/monthdelta.py
+    """
     day = dt.day
     # subract one because months are not zero-based
     month = dt.month + mon - 1
@@ -189,32 +195,40 @@ def update_notifications(tutor:Tutor):
     Clear all current notification and add new ones based on the updated student information
     """
     #TODO: update lessons
-    notifications_delete_query = f"DELETE FROM notification WHERE WHERE tutor_id = {tutor.tutor_id};"
+    # Remove outdated notifications
+    notification_read_query = f"SELECT notification_id FROM notification WHERE tutor_id = {tutor.tutor_id};"
+    notifications_db = execute_query(notification_read_query)
+    for n in notifications_db:
+        remove_cron_job(n[0])
+
+    notifications_delete_query = f"DELETE FROM notification WHERE tutor_id = {tutor.tutor_id};"
     execute_query(notifications_delete_query, readonly=True)
 
-    student_read_query = f"SELECT DISTINCT student_id, payment_amount, payment_currency FROM student WHERE tutor_id = {tutor.tutor_id};"
+    # Read students from DB to update notifications for each of them
+    student_read_query = f"SELECT DISTINCT student_id, chat_id, payment_amount, payment_currency FROM student WHERE tutor_id = {tutor.tutor_id};"
     students_db = execute_query(student_read_query)
     if students_db is not None and len(students_db)>0:
         for s in students_db:
             student_id = s[0]
-            payment_amount = s[1]
-            payment_currency = s[2]
-            # Update Cron jobs
-            # TODO: Update Cron jobs, write tests
-            # Update DB
+            chat_id = s[1]
+            payment_amount = s[2]
+            payment_currency = s[3]
             try:
-                datetime_now = datetime(datetime.now().year,datetime.now().month, NOTIFICATION_DAY, hour=NOTIFICATION_HOUR)
+                datetime_this_month = datetime(datetime.now().year,datetime.now().month, NOTIFICATION_DAY, hour=NOTIFICATION_HOUR)
             except ValueError:
-                datetime_now = datetime(datetime.now().year,datetime.now().month, 28, hour=NOTIFICATION_HOUR)
+                datetime_this_month = datetime(datetime.now().year,datetime.now().month, 28, hour=NOTIFICATION_HOUR)
                 logger.warning("Date of notification does not exists, the current month is shorter")
-            datetime_plus_month = plus_month(datetime_now, 1)
+            datetime_plus_month = plus_month(datetime_this_month, 1)
+            notification_text = f"Good morning, time to pay for the next month exercises. \n Your monthly payment is {payment_amount} {payment_currency}"
+
+            # Update DB
             # For the current month
             notification_write_query = "INSERT INTO notification(tutor_id, student_id, notification_datetime, description, tg_message, added_at) VALUES (" + \
                     str(tutor.tutor_id) + ", " + \
                     str(student_id) + ", '" + \
-                    str(datetime_now) + "', '" + \
+                    str(datetime_this_month) + "', '" + \
                     "Payment" + "', '" + \
-                    str(f"Good morning, time to pay for the next month exercises. \n Your monthly payment is {payment_amount} {payment_currency}") + "', '" + \
+                    str(notification_text) + "', '" + \
                     str(datetime.now()) + "');"
             execute_query(notification_write_query, readonly=True)
             # For the next month
@@ -223,8 +237,88 @@ def update_notifications(tutor:Tutor):
                     str(student_id) + ", '" + \
                     str(datetime_plus_month) + "', '" + \
                     "Payment" + "', '" + \
-                    str(f"Good morning, time to pay for the next month exercises. \n Your monthly payment is {payment_amount} {payment_currency}") + "', '" + \
+                    str(notification_text) + "', '" + \
                     str(datetime.now()) + "');"
             execute_query(notification_write_query, readonly=True)
+
+            # Read notifications IDs from DB
+            notification_read_query = "SELECT notification_id FROM notification WHERE student_id = " + \
+                    str(student_id) + " AND notification_datetime = '" + \
+                    str(datetime_this_month) + "';"
+            notifications_db = execute_query(notification_read_query)
+            notification_cur_id = notifications_db[0][0]
+
+            notification_read_query = "SELECT notification_id FROM notification WHERE student_id = " + \
+                    str(student_id) + " AND notification_datetime = '" + \
+                    str(datetime_plus_month) + "';"
+            notifications_db = execute_query(notification_read_query)
+            notification_next_id = notifications_db[0][0]
+                    
+            # Update Cron jobs
+            cron_time = f"{0} {datetime_this_month.hour} {datetime_this_month.day} {datetime_this_month.month} *"
+            add_cron_job(cron_time, chat_id, "test message", notification_cur_id)
+            cron_time = f"{0} {datetime_plus_month.hour} {datetime_plus_month.day} {datetime_plus_month.month} *"
+            add_cron_job(cron_time, chat_id, "test message", notification_next_id)
+
             logger.info("Added new notification for payment")
 
+
+def get_student_payment(tg_chat_id:int)->tuple[float, str]:
+    """Read from DB payment information
+
+    Args:
+        tg_chat_id (int): message.chat.id from telegram
+
+    Returns:
+        tuple[float, str]: amount, currency of payment
+    """
+    payment_read_query = f"SELECT payment_amount, payment_currency FROM student WHERE chat_id = {tg_chat_id}"
+    payment_db = execute_query(payment_read_query)
+    if payment_db is not None and len(payment_db)>0:
+        amount = payment_db[0][0]
+        currency = payment_db[0][1]
+        return amount, currency
+    else:
+        logger.error(f"Could not read payment information for the user with chat_id {tg_chat_id}")
+        return None
+
+
+def get_chat_state(tg_chat_id:int)->str:
+    """Read from DB current telegram chat state.
+
+    Args:
+        chat_id (int): message.chat.id from telegram
+
+    Returns:
+        str: possible options: START, USER, TUTOR, UNIQUE_ID
+    """
+    try:
+        chat_read_query = f"SELECT chat_state FROM chat WHERE tg_chat_id = {tg_chat_id}"
+        chat_state = execute_query(chat_read_query)
+        if chat_state is not None and len(chat_state)>0:
+            return chat_state[0][0]
+        else:
+            return None
+    except Exception as exc:
+        logger.exception(exc)
+        return None
+
+
+def set_chat_state(tg_chat_id:int, state:str):
+    """Write to the DB current telegram chat state.
+
+    Args:
+        chat_id (int): message.chat.id from telegram
+        state (str): possible options: START, USER, TUTOR, UNIQUE_ID
+    """
+    try:
+        chat_delete_query = f"DELETE FROM chat WHERE tg_chat_id = {tg_chat_id}"
+        execute_query(chat_delete_query, readonly=True)
+
+        chat_write_query = "INSERT INTO chat(tg_chat_id, chat_state, added_at) VALUES(" + \
+                str(tg_chat_id) + ", '" + \
+                str(state) + "', '" + \
+                str(datetime.now()) + "');"
+        execute_query(chat_write_query, readonly=True)
+    except Exception as exc:
+        logger.exception(exc)

@@ -5,7 +5,7 @@ import logging
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.adapters.db_connector import load_config, execute_query
+from app.adapters.db import load_config, execute_query
 
 
 class TestXlsParser(unittest.TestCase):

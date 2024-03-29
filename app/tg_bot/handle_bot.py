@@ -1,6 +1,7 @@
 """
 This example shows how to use webhook with SSL certificate.
 """
+import os
 import ssl
 import sys
 from os import getenv
@@ -22,12 +23,16 @@ from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_applicati
 from aiogram.methods import SetMyDescription
 from aiogram import F
 
-from app.adapters.shedule_cron import add_cron_job, remove_cron_job, list_cron_jobs, list_today_jobs
+# from app.adapters.cron import add_cron_job, remove_cron_job, list_cron_jobs, list_today_jobs
 from app.common.models import *
 from app.common.common_functions import *
 
+
+sys.path.append(os.path.abspath(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
+
 # Bot token can be obtained via https://t.me/BotFather
 TOKEN_FILE = "config/token.txt"
+TOKEN_FILE = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), TOKEN_FILE))
 with open(TOKEN_FILE, 'r') as file:
     TOKEN = file.read()
 
@@ -47,7 +52,9 @@ BASE_WEBHOOK_URL = "179.43.151.16"
 
 # Path to SSL certificate and private key for self-signed certificate.
 WEBHOOK_SSL_CERT = "config/tg_public.pem"
+WEBHOOK_SSL_CERT = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), WEBHOOK_SSL_CERT))
 WEBHOOK_SSL_PRIV = "config/tg_private.key"
+WEBHOOK_SSL_PRIV = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), WEBHOOK_SSL_PRIV))
 
 # Functionality-related definitions
 TIMEZONE_OFFSET = 1 # GMT+1 for Austria
@@ -117,16 +124,15 @@ async def command_tutor_handler(message: Message) -> None:
     """
     This handler receives messages with answer `Tutor` to the question Are you a student or a tutor?
     """
-    global STATE
     tutor_name = message.from_user.full_name
-    tutor = Tutor(contact_id=message.from_user.id, full_name=tutor_name, phone_number=' ')
+    tutor = Tutor(chat_id=message.chat.id, full_name=tutor_name, phone_number=' ')
     is_added = add_tutor(tutor)
     if is_added == 0:
-        STATE = "Tutor"
+        set_chat_state(message.chat.id, "TUTOR")
         await message.answer(f"Welcome back, {tutor_name}! Upload new students book", 
                              reply_markup=reply_keyboard_remove.ReplyKeyboardRemove(remove_keyboard=True))
     elif  is_added == 1:
-        STATE = "Tutor"
+        set_chat_state(message.chat.id, "TUTOR")
         example_book = "received_xlsx/shedule_example.xlsx"
         file = FSInputFile(example_book, filename="shedule_example.xlsx")
         await message.answer_document(document=file, 
@@ -139,14 +145,31 @@ async def command_tutor_handler(message: Message) -> None:
 
 
 @router.message(F.text == "Student")
-async def command_tutor_handler(message: Message) -> None:
+async def command_student_handler(message: Message) -> None:
     """
     This handler receives messages with answer `Student` to the question Are you a student or a tutor?
     """
-    global STATE
-    STATE = "Waiting for unique_id"
+    set_chat_state(message.chat.id, "UNIQUE_ID")
     await message.answer(f"Provide the unique ID from your tutor please", 
                          reply_markup=reply_keyboard_remove.ReplyKeyboardRemove(remove_keyboard=True))    
+
+
+@router.message(F.text == "Shedule")
+async def command_shedule_handler(message: Message) -> None:
+    """
+    This handler answers button `Shedule`
+    """
+
+    await message.answer("Not implemented yet")    
+
+
+@router.message(F.text == "Payment")
+async def command_shedule_handler(message: Message) -> None:
+    """
+    This handler answers button `Payment`
+    """
+    amount, currency = get_student_payment(message.chat.id)
+    await message.answer(f"For the next month you'll have to pay {amount} {currency}")    
 
 
 @router.message(F.document)
@@ -160,7 +183,7 @@ async def doc_handler(message: types.Message, bot:Bot) -> None:
             file.file_path,
             "received_xlsx/shedule_new.xlsx"
         )
-        tutor = get_tutor_by_contact_id(message.from_user.id)
+        tutor = get_tutor_by_chat_id(message.chat.id)
         if tutor is None:
             await message.answer("The file is OK, but we couldn't read your profile from the database, error occured")
         else:
@@ -186,157 +209,186 @@ async def new_message_handler(message: types.Message) -> None:
     chat_id=message.chat.id
     user_id = message.from_user.id
     request = message.text
-    global STATE
-    if STATE == "Waiting for unique_id":
+    state = get_chat_state(message.chat.id)
+    if state is None or state == "START":
+        set_chat_state(message.chat.id, "START")
+        await command_start_handler(message)
+
+    elif state == "UNIQUE_ID":
         student_unique_id = message.text
-        student_contact_id = message.from_user.id
         result = update_student_contact(unique_id=student_unique_id,
-                                        contact_id=student_contact_id,
+                                        chat_id=chat_id,
                                         phone_number=' ')
+        kb = [
+            [types.KeyboardButton(text="Payment")],
+            [types.KeyboardButton(text="Shedule")]
+        ]
+        keyboard = types.ReplyKeyboardMarkup(keyboard=kb)
         if result == 0:
             await message.answer("❌ Such user was not found, please contact the tutor for the valid user_id")
         elif result == 1:
-            await message.answer(f"✅ Welcome, {message.from_user.full_name}. I'll remind you about the next payment")
+            await message.answer(f"✅ Welcome, {message.from_user.full_name}. I'll remind you about the next payment", 
+                            reply_markup=keyboard)
         else:
             await message.answer("❌ An error occured and the user was not found, please contact the tutor")
-        STATE = "User"
-        return 0
+        set_chat_state(message.chat.id, "STUDENT")
+
+    elif state == "STUDENT":
+        kb = [
+            [types.KeyboardButton(text="Payment")],
+            [types.KeyboardButton(text="Shedule")]
+        ]
+        keyboard = types.ReplyKeyboardMarkup(keyboard=kb)
+        await message.answer("Sorry, didn't understad that", 
+                            reply_markup=keyboard)
+    
+    else:
+        "Something went wrong, please contact the tutor"
+
     
 
-    try:
-        request_content = request.split(" ")
-        if request_content[0].lower() == "schedule":
-            event_time_str = request_content[1]
-            event_time = datetime.strptime(event_time_str, "%H:%M")
-            try:
-                event_time = datetime.strptime(event_time_str, "%H:%M")
-            except ValueError:
-                event_time = datetime.strptime(event_time_str, "%-H:%M")
-            event_time -= timedelta(hours=TIMEZONE_OFFSET)
-            event_time -= timedelta(minutes=NOTIFICATION_TIMEDELTA_MIN)
+    # try:
+    #     request_content = request.split(" ")
+    #     if request_content[0].lower() == "schedule":
+    #         event_time_str = request_content[1]
+    #         event_time = datetime.strptime(event_time_str, "%H:%M")
+    #         try:
+    #             event_time = datetime.strptime(event_time_str, "%H:%M")
+    #         except ValueError:
+    #             event_time = datetime.strptime(event_time_str, "%-H:%M")
+    #         event_time -= timedelta(hours=TIMEZONE_OFFSET)
+    #         event_time -= timedelta(minutes=NOTIFICATION_TIMEDELTA_MIN)
 
-            event_period_str = request_content[2]
-            event_period = (strptime(event_period_str, "%A").tm_wday + 1) % 7
-            event_desc = " ".join(request_content[3:])
+    #         event_period_str = request_content[2]
+    #         event_period = (strptime(event_period_str, "%A").tm_wday + 1) % 7
+    #         event_desc = " ".join(request_content[3:])
 
-            new_job_id = get_job_id()
+    #         new_job_id = get_job_id()
 
-            # with open(DB_FILE,'r') as yamlfile:
-            #     db_yaml = yaml.safe_load(yamlfile) # Note the safe_load
+    #         # with open(DB_FILE,'r') as yamlfile:
+    #         #     db_yaml = yaml.safe_load(yamlfile) # Note the safe_load
 
-            # if db_yaml is None:
-            #     db_yaml = {user_id:[new_job_id]}
-            # if user_id not in db_yaml.keys():
-            #     db_yaml.update({user_id:[]})
-            # db_yaml[user_id].append(new_job_id)
+    #         # if db_yaml is None:
+    #         #     db_yaml = {user_id:[new_job_id]}
+    #         # if user_id not in db_yaml.keys():
+    #         #     db_yaml.update({user_id:[]})
+    #         # db_yaml[user_id].append(new_job_id)
 
-            cron_time = f"{event_time.minute} {event_time.hour} * * {event_period}"
-            msg_to_send = event_desc
+    #         cron_time = f"{event_time.minute} {event_time.hour} * * {event_period}"
+    #         msg_to_send = event_desc
 
-            add_cron_job(cron_period=cron_time, chat_id=chat_id, message=msg_to_send, id=new_job_id)
+    #         add_cron_job(cron_period=cron_time, chat_id=chat_id, message=msg_to_send, id=new_job_id)
 
-            # if db_yaml:
-            #     with open(DB_FILE,'w') as yamlfile:
-            #         yaml.safe_dump(db_yaml, yamlfile) # Also note the safe_dump
+    #         # if db_yaml:
+    #         #     with open(DB_FILE,'w') as yamlfile:
+    #         #         yaml.safe_dump(db_yaml, yamlfile) # Also note the safe_dump
                     
-            event_time += timedelta(hours=TIMEZONE_OFFSET)
-            event_time += timedelta(minutes=NOTIFICATION_TIMEDELTA_MIN)
+    #         event_time += timedelta(hours=TIMEZONE_OFFSET)
+    #         event_time += timedelta(minutes=NOTIFICATION_TIMEDELTA_MIN)
 
-            logger.info(f"set a job for {cron_time}")
-            logger.info(
-                f"Set an occuring event for {event_time.strftime('%H:%M')} {event_period_str}s: {event_desc}")
+    #         logger.info(f"set a job for {cron_time}")
+    #         logger.info(
+    #             f"Set an occuring event for {event_time.strftime('%H:%M')} {event_period_str}s: {event_desc}")
             
-            await message.answer(
-                f"✅ Set an occuring event for {event_time.strftime('%H:%M')} {event_period_str}s: {event_desc}")
+    #         await message.answer(
+    #             f"✅ Set an occuring event for {event_time.strftime('%H:%M')} {event_period_str}s: {event_desc}")
         
-        elif request_content[0].lower() == "once":
-            event_datetime_str = " ".join(request_content[1:3])
-            try:
-                event_datetime = datetime.strptime(event_datetime_str, "%Y-%m-%d %H:%M")
-            except ValueError:
-                event_datetime = datetime.strptime(event_datetime_str, "%Y-%m-%-d %H:%M")
+    #     elif request_content[0].lower() == "once":
+    #         event_datetime_str = " ".join(request_content[1:3])
+    #         try:
+    #             event_datetime = datetime.strptime(event_datetime_str, "%Y-%m-%d %H:%M")
+    #         except ValueError:
+    #             event_datetime = datetime.strptime(event_datetime_str, "%Y-%m-%-d %H:%M")
 
-            event_desc = " ".join(request_content[3:])
+    #         event_desc = " ".join(request_content[3:])
 
             
-            event_datetime -= timedelta(hours=TIMEZONE_OFFSET)
-            event_datetime -= timedelta(minutes=NOTIFICATION_TIMEDELTA_MIN)
+    #         event_datetime -= timedelta(hours=TIMEZONE_OFFSET)
+    #         event_datetime -= timedelta(minutes=NOTIFICATION_TIMEDELTA_MIN)
 
-            new_job_id = get_job_id()
+    #         new_job_id = get_job_id()
 
-            cron_time = f"{event_datetime.minute} {event_datetime.hour} {event_datetime.day} {event_datetime.month} *"
-            msg_to_send = event_desc
+    #         cron_time = f"{event_datetime.minute} {event_datetime.hour} {event_datetime.day} {event_datetime.month} *"
+    #         msg_to_send = event_desc
 
-            add_cron_job(cron_period=cron_time, chat_id=chat_id, message=msg_to_send, id=new_job_id)
+    #         add_cron_job(cron_period=cron_time, chat_id=chat_id, message=msg_to_send, id=new_job_id)
                     
-            event_datetime += timedelta(hours=TIMEZONE_OFFSET)
-            event_datetime += timedelta(minutes=NOTIFICATION_TIMEDELTA_MIN)
-            logger.info(f"set a job for {cron_time}")
-            logger.info(
-                f"Set a one-time event for {event_datetime}: {event_desc}")
-            await message.answer(
-                f"✅ Set a one-time event for {event_datetime}: {event_desc}")
+    #         event_datetime += timedelta(hours=TIMEZONE_OFFSET)
+    #         event_datetime += timedelta(minutes=NOTIFICATION_TIMEDELTA_MIN)
+    #         logger.info(f"set a job for {cron_time}")
+    #         logger.info(
+    #             f"Set a one-time event for {event_datetime}: {event_desc}")
+    #         await message.answer(
+    #             f"✅ Set a one-time event for {event_datetime}: {event_desc}")
         
-        elif request_content[0].lower() == "remove":
-            event_desc_or_id_str = " ".join(request_content[1:])
-            event_desc = None
-            event_id = None
-            try:
-                event_id = int(event_desc_or_id_str)
-            except ValueError:
-                event_desc = event_desc_or_id_str
+    #     elif request_content[0].lower() == "remove":
+    #         event_desc_or_id_str = " ".join(request_content[1:])
+    #         event_desc = None
+    #         event_id = None
+    #         try:
+    #             event_id = int(event_desc_or_id_str)
+    #         except ValueError:
+    #             event_desc = event_desc_or_id_str
 
-            remove_cron_job(chat_id=chat_id, id=event_id, desc=event_desc)
+    #         remove_cron_job(chat_id=chat_id, id=event_id, desc=event_desc)
 
-            logger.info(
-                f"Removed event: {event_desc_or_id_str}")
-            await message.answer(
-                f"✅ Removed event: {event_desc_or_id_str}")
+    #         logger.info(
+    #             f"Removed event: {event_desc_or_id_str}")
+    #         await message.answer(
+    #             f"✅ Removed event: {event_desc_or_id_str}")
         
-        elif request_content[0].lower() == "disable":
-            event_desc = " ".join(request_content[1:-2])
-            event_datetime_str = " ".join(request_content[-2:])
-            try:
-                event_datetime = datetime.strptime(event_datetime_str, "%Y-%m-%d %H:%M")
-            except ValueError:
-                event_datetime = datetime.strptime(event_datetime_str, "%Y-%m-%-d %H:%M")
+    #     elif request_content[0].lower() == "disable":
+    #         event_desc = " ".join(request_content[1:-2])
+    #         event_datetime_str = " ".join(request_content[-2:])
+    #         try:
+    #             event_datetime = datetime.strptime(event_datetime_str, "%Y-%m-%d %H:%M")
+    #         except ValueError:
+    #             event_datetime = datetime.strptime(event_datetime_str, "%Y-%m-%-d %H:%M")
             
-            logger.info(
-                f"Not implemented, tried to: Disabled event: {event_desc} for {event_datetime}")
-            await message.answer(
-                f"❌ Not implemented, tried to: Disable event: {event_desc} for {event_datetime}")
+    #         logger.info(
+    #             f"Not implemented, tried to: Disabled event: {event_desc} for {event_datetime}")
+    #         await message.answer(
+    #             f"❌ Not implemented, tried to: Disable event: {event_desc} for {event_datetime}")
         
-        elif request_content[0].lower() == "list":
-            events_list = "Currently scheduled [id: description]:\n"
+    #     elif request_content[0].lower() == "list":
+    #         events_list = "Currently scheduled [id: description]:\n"
 
-            cur_jobs = list_cron_jobs(chat_id)
-            for job_id, job_dec in cur_jobs.items():
-                events_list += f" - {job_id}: {job_dec}\n"
-            if len(cur_jobs.items()) == 0:
-                events_list += "Nothing"
+    #         cur_jobs = list_cron_jobs(chat_id)
+    #         for job_id, job_dec in cur_jobs.items():
+    #             events_list += f" - {job_id}: {job_dec}\n"
+    #         if len(cur_jobs.items()) == 0:
+    #             events_list += "Nothing"
 
-            await message.answer(events_list)
+    #         await message.answer(events_list)
         
-        elif request_content[0].lower() == "today":
-            events_list = "Today scheduled [id: description time]:\n"
+    #     elif request_content[0].lower() == "today":
+    #         events_list = "Today scheduled [id: description time]:\n"
 
-            cur_jobs = list_today_jobs(chat_id)
-            for job_id, job_dec in cur_jobs.items():
-                events_list += f" - {job_id}: {job_dec}\n"
-            if len(cur_jobs.items()) == 0:
-                events_list += "Nothing"
+    #         cur_jobs = list_today_jobs(chat_id)
+    #         for job_id, job_dec in cur_jobs.items():
+    #             events_list += f" - {job_id}: {job_dec}\n"
+    #         if len(cur_jobs.items()) == 0:
+    #             events_list += "Nothing"
 
-            await message.answer(events_list)
+    #         await message.answer(events_list)
             
-        else:
-            await message.answer("❌ Unsupported format")
+    #     else:
+    #         await message.answer("❌ Unsupported format")
             
-    except Exception:
-        logger.exception(f"Error handling request: {request}")
-        # But not all the types is supported to be copied so need to handle it
-        await message.answer("❌ Unsupported format")
+    # except Exception:
+    #     logger.exception(f"Error handling request: {request}")
+    #     # But not all the types is supported to be copied so need to handle it
+    #     await message.answer("❌ Unsupported format")
 
 
+async def send_message(id:int, message:str):
+    """
+    Send a text message to specific chat_id
+    """
+    print(id)
+    async with Bot(token=TOKEN).context() as bot:
+        await bot.send_message(text=message, chat_id=id)    
+    # await operator.close()
 
 
 async def on_startup(bot: Bot) -> None:
@@ -354,7 +406,9 @@ async def on_startup(bot: Bot) -> None:
 
 
 def run_tg_bot() -> None:
-
+    """
+    Set up the websocket server for telegram bot communication
+    """
     # Dispatcher is a root router
     dp = Dispatcher()
     # ... and all other routers should be attached to Dispatcher
