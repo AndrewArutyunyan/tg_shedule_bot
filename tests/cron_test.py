@@ -9,7 +9,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from app.adapters.cron import add_cron_job, list_cron_jobs, remove_cron_job
 
 
-class TestXlsParser(unittest.TestCase):
+class TestCron(unittest.TestCase):
     logger = logging.getLogger(__name__)
     logging.basicConfig(format = '%(asctime)s %(module)s %(levelname)s: %(message)s',
                     datefmt = '%m/%d/%Y %H:%M:%S', level = logging.INFO)
