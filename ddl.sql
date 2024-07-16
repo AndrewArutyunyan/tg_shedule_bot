@@ -78,5 +78,6 @@ CREATE TABLE IF NOT EXISTS chat
 	chat_id SERIAL PRIMARY KEY,
 	tg_chat_id INTEGER,
 	chat_state VARCHAR(100),
+  last_message VARCHAR(1000),
 	added_at timestamp
 );

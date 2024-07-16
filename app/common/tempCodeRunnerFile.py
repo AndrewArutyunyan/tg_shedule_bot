@@ -1,0 +1,1 @@
+chat_state = execute_query(chat_read_query)

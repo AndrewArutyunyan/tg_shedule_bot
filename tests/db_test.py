@@ -20,7 +20,7 @@ class TestXlsParser(unittest.TestCase):
         """
         conf_file = 'config/database.ini'
         config = load_config(conf_file)
-        results = execute_query("SELECT 1;", config)
+        results = execute_query("SELECT 1;", config=config, writeonly=False)
         self.assertEqual(results, [(1,)])
 
     def test_sql_table_query(self):

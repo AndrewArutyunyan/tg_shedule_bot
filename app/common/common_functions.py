@@ -28,7 +28,7 @@ def add_tutor(tutor:Tutor)->int:
                 str(tutor.full_name) + "', '" + \
                 str(tutor.phone_number) + "', '" + \
                 str(datetime.now()) + "');"
-            execute_query(tutor_write_query, readonly=True)
+            execute_query(tutor_write_query, writeonly=True)
             logger.info("Added new tutor")
             return 1
         else:
@@ -75,7 +75,7 @@ def update_students_from_excel(filename:str, tutor:Tutor)->List[Student]:
                 str(tutor.full_name) + "', '" + \
                 str(tutor.phone_number) + "', '" + \
                 str(datetime.now()) + "');"
-            execute_query(tutor_write_query, readonly=True)
+            execute_query(tutor_write_query, writeonly=True)
             logger.info("Added new tutor")
 
         students_excel = read_students_excel(filename)
@@ -97,14 +97,14 @@ def update_students_from_excel(filename:str, tutor:Tutor)->List[Student]:
                     str(s_excel.unique_id) + "', '" + \
                     str(s_excel.full_name) + "', '" + \
                     str(datetime.now()) + "');"
-                execute_query(student_write_query, readonly=True)
+                execute_query(student_write_query, writeonly=True)
                 logger.info("Added new student " + s_excel.unique_id)
             else:
                 student_update_query = "UPDATE student SET payment_amount = " + \
                     str(s_excel.payment_amount) + ", payment_currency = '" + \
                     str(s_excel.payment_currency) + "' WHERE  unique_id = '" + \
                     str(s_excel.unique_id) + "';"
-                execute_query(student_update_query, readonly=True)
+                execute_query(student_update_query, writeonly=True)
                 logger.info(f"Updated payment information of user {s_excel.unique_id}")
 
         return students_excel
@@ -122,7 +122,7 @@ def update_student_contact(unique_id:str, chat_id:int, phone_number:str)->int:
         None - error occured
     """
     try:
-        student_read_query = "SELECT DISTINCT student_id FROM student WHERE unique_id ='" + \
+        student_read_query = "SELECT DISTINCT student_id, tutor_id FROM student WHERE unique_id ='" + \
             str(unique_id) + "';"
         students_ids_db = execute_query(student_read_query)
         if len(students_ids_db) == 0:
@@ -133,8 +133,11 @@ def update_student_contact(unique_id:str, chat_id:int, phone_number:str)->int:
                 str(chat_id) + ", phone_number = '" + \
                 str(phone_number) + "' WHERE  unique_id = '" + \
                 str(unique_id) + "';"
-            execute_query(student_write_query, readonly=True)
+            execute_query(student_write_query, writeonly=True)
             logger.info(f"Updated contact information of user {unique_id}")
+            # Update notifications
+            tutor = Tutor(tutor_id=students_ids_db[0][1])
+            update_notifications(tutor)
             return 1
     except Exception as exp:
         logger.exception(exp)
@@ -157,7 +160,7 @@ def remove_outdated_students(students:List[Student])->None:
             student_delete_query = "DELETE FROM student WHERE unique_id IN ('" + \
                 "', '".join(students_to_delete) + \
                 "');"
-            execute_query(student_delete_query, readonly=True)
+            execute_query(student_delete_query, writeonly=True)
         logger.info(f"Deleted all outdated student records except {len(students)} names")
 
     except Exception as exp:
@@ -202,7 +205,7 @@ def update_notifications(tutor:Tutor):
         remove_cron_job(n[0])
 
     notifications_delete_query = f"DELETE FROM notification WHERE tutor_id = {tutor.tutor_id};"
-    execute_query(notifications_delete_query, readonly=True)
+    execute_query(notifications_delete_query, writeonly=True)
 
     # Read students from DB to update notifications for each of them
     student_read_query = f"SELECT DISTINCT student_id, chat_id, payment_amount, payment_currency FROM student WHERE tutor_id = {tutor.tutor_id};"
@@ -213,54 +216,54 @@ def update_notifications(tutor:Tutor):
             chat_id = s[1]
             payment_amount = s[2]
             payment_currency = s[3]
-            try:
-                datetime_this_month = datetime(datetime.now().year,datetime.now().month, NOTIFICATION_DAY, hour=NOTIFICATION_HOUR)
-            except ValueError:
-                datetime_this_month = datetime(datetime.now().year,datetime.now().month, 28, hour=NOTIFICATION_HOUR)
-                logger.warning("Date of notification does not exists, the current month is shorter")
-            datetime_plus_month = plus_month(datetime_this_month, 1)
-            notification_text = f"Good morning, time to pay for the next month exercises. \n Your monthly payment is {payment_amount} {payment_currency}"
+            if chat_id is not None:
+                try:
+                    datetime_this_month = datetime(datetime.now().year,datetime.now().month, NOTIFICATION_DAY, hour=NOTIFICATION_HOUR)
+                except ValueError:
+                    datetime_this_month = datetime(datetime.now().year,datetime.now().month, 28, hour=NOTIFICATION_HOUR)
+                    logger.warning("Date of notification does not exists, the current month is shorter")
+                datetime_plus_month = plus_month(datetime_this_month, 1)
+                notification_text = f"Good morning, time to pay for the next month exercises. Your monthly payment is {payment_amount} {payment_currency}"
 
-            # Update DB
-            # For the current month
-            notification_write_query = "INSERT INTO notification(tutor_id, student_id, notification_datetime, description, tg_message, added_at) VALUES (" + \
-                    str(tutor.tutor_id) + ", " + \
-                    str(student_id) + ", '" + \
-                    str(datetime_this_month) + "', '" + \
-                    "Payment" + "', '" + \
-                    str(notification_text) + "', '" + \
-                    str(datetime.now()) + "');"
-            execute_query(notification_write_query, readonly=True)
-            # For the next month
-            notification_write_query = "INSERT INTO notification(tutor_id, student_id, notification_datetime, description, tg_message, added_at) VALUES (" + \
-                    str(tutor.tutor_id) + ", " + \
-                    str(student_id) + ", '" + \
-                    str(datetime_plus_month) + "', '" + \
-                    "Payment" + "', '" + \
-                    str(notification_text) + "', '" + \
-                    str(datetime.now()) + "');"
-            execute_query(notification_write_query, readonly=True)
+                # Update DB
+                # For the current month
+                notification_write_query = "INSERT INTO notification(tutor_id, student_id, notification_datetime, description, tg_message, added_at) VALUES (" + \
+                        str(tutor.tutor_id) + ", " + \
+                        str(student_id) + ", '" + \
+                        str(datetime_this_month) + "', '" + \
+                        "Payment" + "', '" + \
+                        str(notification_text) + "', '" + \
+                        str(datetime.now()) + "');"
+                execute_query(notification_write_query, writeonly=True)
+                # For the next month
+                notification_write_query = "INSERT INTO notification(tutor_id, student_id, notification_datetime, description, tg_message, added_at) VALUES (" + \
+                        str(tutor.tutor_id) + ", " + \
+                        str(student_id) + ", '" + \
+                        str(datetime_plus_month) + "', '" + \
+                        "Payment" + "', '" + \
+                        str(notification_text) + "', '" + \
+                        str(datetime.now()) + "');"
+                execute_query(notification_write_query, writeonly=True)
 
-            # Read notifications IDs from DB
-            notification_read_query = "SELECT notification_id FROM notification WHERE student_id = " + \
-                    str(student_id) + " AND notification_datetime = '" + \
-                    str(datetime_this_month) + "';"
-            notifications_db = execute_query(notification_read_query)
-            notification_cur_id = notifications_db[0][0]
+                # Read notifications IDs from DB
+                notification_read_query = "SELECT notification_id FROM notification WHERE student_id = " + \
+                        str(student_id) + " AND notification_datetime = '" + \
+                        str(datetime_this_month) + "';"
+                notifications_db = execute_query(notification_read_query)
+                notification_cur_id = notifications_db[0][0]
 
-            notification_read_query = "SELECT notification_id FROM notification WHERE student_id = " + \
-                    str(student_id) + " AND notification_datetime = '" + \
-                    str(datetime_plus_month) + "';"
-            notifications_db = execute_query(notification_read_query)
-            notification_next_id = notifications_db[0][0]
+                notification_read_query = "SELECT notification_id FROM notification WHERE student_id = " + \
+                        str(student_id) + " AND notification_datetime = '" + \
+                        str(datetime_plus_month) + "';"
+                notifications_db = execute_query(notification_read_query)
+                notification_next_id = notifications_db[0][0]
                     
-            # Update Cron jobs
-            cron_time = f"{0} {datetime_this_month.hour} {datetime_this_month.day} {datetime_this_month.month} *"
-            add_cron_job(cron_time, chat_id, "test message", notification_cur_id)
-            cron_time = f"{0} {datetime_plus_month.hour} {datetime_plus_month.day} {datetime_plus_month.month} *"
-            add_cron_job(cron_time, chat_id, "test message", notification_next_id)
-
-            logger.info("Added new notification for payment")
+                # Update Cron jobs
+                cron_time = f"{0} {datetime_this_month.hour} {datetime_this_month.day} {datetime_this_month.month} *"
+                add_cron_job(cron_time, chat_id,  notification_text, notification_cur_id)
+                cron_time = f"{0} {datetime_plus_month.hour} {datetime_plus_month.day} {datetime_plus_month.month} *"
+                add_cron_job(cron_time, chat_id,  notification_text, notification_next_id)
+                logger.info("Added new notification for payment")
 
 
 def get_student_payment(tg_chat_id:int)->tuple[float, str]:
@@ -293,7 +296,7 @@ def get_chat_state(tg_chat_id:int)->str:
         str: possible options: START, USER, TUTOR, UNIQUE_ID
     """
     try:
-        chat_read_query = f"SELECT chat_state FROM chat WHERE tg_chat_id = {tg_chat_id}"
+        chat_read_query = f"SELECT chat_state FROM chat WHERE tg_chat_id = {tg_chat_id};"
         chat_state = execute_query(chat_read_query)
         if chat_state is not None and len(chat_state)>0:
             return chat_state[0][0]
@@ -313,12 +316,52 @@ def set_chat_state(tg_chat_id:int, state:str):
     """
     try:
         chat_delete_query = f"DELETE FROM chat WHERE tg_chat_id = {tg_chat_id}"
-        execute_query(chat_delete_query, readonly=True)
+        execute_query(chat_delete_query, writeonly=True)
 
         chat_write_query = "INSERT INTO chat(tg_chat_id, chat_state, added_at) VALUES(" + \
                 str(tg_chat_id) + ", '" + \
                 str(state) + "', '" + \
                 str(datetime.now()) + "');"
-        execute_query(chat_write_query, readonly=True)
+        execute_query(chat_write_query, writeonly=True)
     except Exception as exc:
         logger.exception(exc)
+
+
+def get_students_list(tutor_chat_id:int)->List[Student]:
+    """
+    Extract a list of student of some tutor from the DB
+
+    Args:
+        tutor_chat_id (int): Chat_id of the tutor
+
+    Returns:
+        List[Student]: array of Student objects
+    """
+    get_students_query = f"""
+        SELECT 
+            student_id, 
+            unique_id, 
+            chat_id, 
+            full_name, 
+            phone_number, 
+            payment_amount, 
+            payment_currency
+        FROM 
+            student
+        WHERE
+            tutor_id = (SELECT tutor_id FROM tutor WHERE chat_id = {tutor_chat_id});
+        """
+    student_list = []
+    try:
+        students_db = execute_query(get_students_query)
+        for s_db in students_db:
+            student_list.append(Student(student_id=s_db[0],
+                                        unique_id=s_db[1],
+                                        chat_id=s_db[2],
+                                        full_name=s_db[3],
+                                        phone_number=s_db[4],
+                                        payment_amount=s_db[5],
+                                        payment_currency=s_db[6]))
+    except Exception as exc:
+        logger.exception(exc)
+    return student_list

@@ -8,10 +8,10 @@ from os import getenv
 from datetime import datetime, timedelta
 from time import strptime
 from time import time
-import yaml
 import logging
 import logging.handlers
-
+from configparser import ConfigParser
+from typing import Tuple
 from aiohttp import web
 
 from aiogram import Bot, Dispatcher, Router, types
@@ -24,8 +24,8 @@ from aiogram.methods import SetMyDescription
 from aiogram import F
 
 # from app.adapters.cron import add_cron_job, remove_cron_job, list_cron_jobs, list_today_jobs
-from app.common.models import *
-from app.common.common_functions import *
+from ..common.models import *
+from ..common.common_functions import *
 
 
 sys.path.append(os.path.abspath(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
@@ -37,18 +37,32 @@ with open(TOKEN_FILE, 'r') as file:
     TOKEN = file.read()
 
 # Webserver settings
-# bind localhost only to prevent any external access
-WEB_SERVER_HOST = "179.43.151.16"
-# Port for incoming request from reverse proxy. Should be any available port
-WEB_SERVER_PORT = 8443
+def parse_config_tg(configfile:str)->Tuple[str, int, str]:
+    parser = ConfigParser()
+    try:
+        parser.read(configfile)
+        params = parser.items('telegram')
+        param_keys  = [x[0].lower() for x in params]
+        param_values = [str(x[1]).lower().replace('"', '').replace("'",'') for x in params]
+        # bind localhost only to prevent any external access
+        host = param_values[param_keys.index('host')]
+        # Port for incoming request from reverse proxy. Should be any available port
+        port = int(param_values[param_keys.index('port')])
+        # Path to webhook route, on which Telegram will send requests
+        path = param_values[param_keys.index('path')]
+    except Exception as e:
+        logger.exception(e)
+        raise e
+    return (host, port, path)
 
-# Path to webhook route, on which Telegram will send requests
-WEBHOOK_PATH = "/webhook"
-# Secret key to validate requests from Telegram (optional)
-WEBHOOK_SECRET = "my-secret"
+WEB_SERVER_HOST, WEB_SERVER_PORT, WEBHOOK_PATH = parse_config_tg(
+    os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+    "config/webhook.ini")))
+
+
 # Base URL for webhook will be used to generate webhook URL for Telegram,
 # in this example it is used public address with TLS support
-BASE_WEBHOOK_URL = "179.43.151.16"
+BASE_WEBHOOK_URL = WEB_SERVER_HOST
 
 # Path to SSL certificate and private key for self-signed certificate.
 WEBHOOK_SSL_CERT = "config/tg_public.pem"
@@ -59,31 +73,12 @@ WEBHOOK_SSL_PRIV = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(
 # Functionality-related definitions
 TIMEZONE_OFFSET = 1 # GMT+1 for Austria
 NOTIFICATION_TIMEDELTA_MIN = 15 # 15 min before event ! Change also in shedule_cron
-GREETING_MSG = f"""
-This bot helps you to manage your schedule.
-Set new assignment and specify time, day of the week and a description with the command: {hbold("schedule [time] [day of the week] [description]")}.
-Time should be in the ISO format HH:mm.
-    Example: schedule 14:00 Tuesday English lesson
 
-Set one-time event with the command: {hbold("once [datatime] [description]")} in the ISO format yyyy-MM-dd HH:mm.
-    Example: once 2024-02-10 18:30 Doctor appointment.
-
-Remove a planned one-time or periodic event by specifing its description or id with the command {hbold("remove [description/id]")}.
-Id lookup table could be fetched by {hbold("list")} command.
-    Examples: remove English lesson, remove 843099249
-
-Disable one eventfrom a serie by specifing its description AND datetime with the command {hbold("disable [description] [datetime]")}.
-    Examples: disable English lesson 2024-02-10 18:30.
-
-List all planned tasks with the command {hbold("list")}.
-
-List today's planned tasks with the command {hbold("today")}.
-"""
 GREETING_MSG_SHORT = """
 Hello, this is Tutor to Student interaction bot! 
 It will keep you on track with payment reminders, sheduling and probably more...
 """
-STATE = "Start"
+
 
 # Logging
 logger = logging.getLogger()
@@ -127,21 +122,44 @@ async def command_tutor_handler(message: Message) -> None:
     tutor_name = message.from_user.full_name
     tutor = Tutor(chat_id=message.chat.id, full_name=tutor_name, phone_number=' ')
     is_added = add_tutor(tutor)
+    kb = [
+        [types.KeyboardButton(text="Students")],
+        [types.KeyboardButton(text="Shedule")]
+    ]
+    keyboard = types.ReplyKeyboardMarkup(keyboard=kb)
     if is_added == 0:
         set_chat_state(message.chat.id, "TUTOR")
         await message.answer(f"Welcome back, {tutor_name}! Upload new students book", 
-                             reply_markup=reply_keyboard_remove.ReplyKeyboardRemove(remove_keyboard=True))
-    elif  is_added == 1:
+                             reply_markup=keyboard)
+    elif is_added == 1:
         set_chat_state(message.chat.id, "TUTOR")
         example_book = "received_xlsx/shedule_example.xlsx"
         file = FSInputFile(example_book, filename="shedule_example.xlsx")
         await message.answer_document(document=file, 
                                       caption=f"Greetings, {tutor_name}! " + \
                                         "Upload an Excel book with a shedule for the current month. Example attached", 
-                                        reply_markup=reply_keyboard_remove.ReplyKeyboardRemove(remove_keyboard=True))
+                                        reply_markup=keyboard)
     else:
         await message.answer(f"Error occured, sorry contact the support contact from the description", 
-                             reply_markup=reply_keyboard_remove.ReplyKeyboardRemove(remove_keyboard=True))
+                             reply_markup=keyboard)  
+
+
+@router.message(F.text == "Students")
+async def command_student_list_handler(message: Message) -> None:
+    """
+    This handler receives messages with request `Students` and lists active students
+    """
+    students = get_students_list(message.chat.id)
+    if len(students) > 0:
+        answer_str = "Here are your students, ✅ subscribed and ❌ not subscribed to the bot:\n"
+        for s in students:
+            if s.chat_id is None:
+                answer_str += "\t- ❌ " + s.unique_id + "\n"
+            else:
+                answer_str += "\t- ✅ " + s.unique_id + " - " + s.full_name + "\n"
+    else:
+        answer_str = "You have no students yet, try to upload a shedule file with a students list"
+    await message.answer(answer_str)    
 
 
 @router.message(F.text == "Student")
@@ -151,7 +169,7 @@ async def command_student_handler(message: Message) -> None:
     """
     set_chat_state(message.chat.id, "UNIQUE_ID")
     await message.answer(f"Provide the unique ID from your tutor please", 
-                         reply_markup=reply_keyboard_remove.ReplyKeyboardRemove(remove_keyboard=True))    
+                         reply_markup=reply_keyboard_remove.ReplyKeyboardRemove(remove_keyboard=True))  
 
 
 @router.message(F.text == "Shedule")
@@ -176,6 +194,11 @@ async def command_shedule_handler(message: Message) -> None:
 async def doc_handler(message: types.Message, bot:Bot) -> None:
     document = message.document
     logger.info("Received a file: " + document.file_name)
+    kb = [
+        [types.KeyboardButton(text="Students")],
+        [types.KeyboardButton(text="Shedule")]
+    ]
+    keyboard = types.ReplyKeyboardMarkup(keyboard=kb)
     if document.file_name.endswith(".xlsx"):
         file_id = document.file_id
         file = await bot.get_file(file_id)
@@ -185,18 +208,21 @@ async def doc_handler(message: types.Message, bot:Bot) -> None:
         )
         tutor = get_tutor_by_chat_id(message.chat.id)
         if tutor is None:
-            await message.answer("The file is OK, but we couldn't read your profile from the database, error occured")
+            await message.answer("The file is OK, but we couldn't read your profile from the database, error occured",
+                                 reply_markup=keyboard)
         else:
             students = update_students_from_excel("received_xlsx/shedule_new.xlsx", tutor)
             remove_outdated_students(students)
             update_notifications(tutor)
             if students is not None:
                 student_names = [s.unique_id for s in students]
-                await message.answer("✅ Successfully added the following students: \n\t- " + "\n\t- ".join(student_names))
+                await message.answer("✅ Successfully added the following students: \n\t- " + "\n\t- ".join(student_names),
+                                 reply_markup=keyboard)
 
     else:
         logger.warning("Filetype is unsupported")
-        await message.answer("❌ Unsupported file format")
+        await message.answer("❌ Unsupported file format",
+                                 reply_markup=keyboard)
 
 
 @router.message()
@@ -232,6 +258,15 @@ async def new_message_handler(message: types.Message) -> None:
         else:
             await message.answer("❌ An error occured and the user was not found, please contact the tutor")
         set_chat_state(message.chat.id, "STUDENT")
+
+    elif state == "STUDENT":
+        kb = [
+            [types.KeyboardButton(text="Payment")],
+            [types.KeyboardButton(text="Shedule")]
+        ]
+        keyboard = types.ReplyKeyboardMarkup(keyboard=kb)
+        await message.answer("Sorry, didn't understad that", 
+                            reply_markup=keyboard)
 
     elif state == "STUDENT":
         kb = [

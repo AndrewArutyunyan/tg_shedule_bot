@@ -1,0 +1,129 @@
+2024-07-16 21:11:46,802 - WARNING - Traceback (most recent call last):
+  File "c:\Users\User\Documents\PythonProjects\shedute_bot\app\tg_bot\handle_bot.py", line 11, in <module>
+    import yaml
+ModuleNotFoundError: No module named 'yaml'
+
+2024-07-16 21:18:56,243 - WARNING - Traceback (most recent call last):
+  File "c:\Users\User\Documents\PythonProjects\shedute_bot\app\tg_bot\handle_bot.py", line 15, in <module>
+    from aiohttp import web
+ModuleNotFoundError: No module named 'aiohttp'
+
+2024-07-16 21:34:11,981 - ERROR - unhandled exception during asyncio.run() shutdown
+task: <Task finished name='Task-1' coro=<_run_app() done, defined at C:\Users\User\Documents\PythonProjects\shedute_bot\venv\lib\site-packages\aiohttp\web.py:303> exception=OSError(10049, "error while attempting to bind on address ('179.43.151.16', 8443): the requested address is not valid in its context")>
+Traceback (most recent call last):
+  File "C:\Users\User\Documents\PythonProjects\shedute_bot\venv\lib\site-packages\aiohttp\web.py", line 544, in run_app
+    loop.run_until_complete(main_task)
+  File "C:\Users\User\.pyenv\pyenv-win\versions\3.10.6\lib\asyncio\base_events.py", line 646, in run_until_complete
+    return future.result()
+  File "C:\Users\User\Documents\PythonProjects\shedute_bot\venv\lib\site-packages\aiohttp\web.py", line 448, in _run_app
+    await site.start()
+  File "C:\Users\User\Documents\PythonProjects\shedute_bot\venv\lib\site-packages\aiohttp\web_runner.py", line 119, in start
+    self._server = await loop.create_server(
+  File "C:\Users\User\.pyenv\pyenv-win\versions\3.10.6\lib\asyncio\base_events.py", line 1505, in create_server
+    raise OSError(err.errno, 'error while attempting '
+OSError: [Errno 10049] error while attempting to bind on address ('179.43.151.16', 8443): the requested address is not valid in its context
+2024-07-16 21:34:11,981 - ERROR - unhandled exception during asyncio.run() shutdown
+task: <Task finished name='Task-1' coro=<_run_app() done, defined at C:\Users\User\Documents\PythonProjects\shedute_bot\venv\lib\site-packages\aiohttp\web.py:303> exception=OSError(10049, "error while attempting to bind on address ('179.43.151.16', 8443): the requested address is not valid in its context")>
+Traceback (most recent call last):
+  File "C:\Users\User\Documents\PythonProjects\shedute_bot\venv\lib\site-packages\aiohttp\web.py", line 544, in run_app
+    loop.run_until_complete(main_task)
+  File "C:\Users\User\.pyenv\pyenv-win\versions\3.10.6\lib\asyncio\base_events.py", line 646, in run_until_complete
+    return future.result()
+  File "C:\Users\User\Documents\PythonProjects\shedute_bot\venv\lib\site-packages\aiohttp\web.py", line 448, in _run_app
+    await site.start()
+  File "C:\Users\User\Documents\PythonProjects\shedute_bot\venv\lib\site-packages\aiohttp\web_runner.py", line 119, in start
+    self._server = await loop.create_server(
+  File "C:\Users\User\.pyenv\pyenv-win\versions\3.10.6\lib\asyncio\base_events.py", line 1505, in create_server
+    raise OSError(err.errno, 'error while attempting '
+OSError: [Errno 10049] error while attempting to bind on address ('179.43.151.16', 8443): the requested address is not valid in its context
+2024-07-16 21:36:17,059 - ERROR - unhandled exception during asyncio.run() shutdown
+task: <Task finished name='Task-1' coro=<_run_app() done, defined at C:\Users\User\Documents\PythonProjects\shedute_bot\venv\lib\site-packages\aiohttp\web.py:303> exception=OSError(10049, "error while attempting to bind on address ('179.43.151.16', 8443): the requested address is not valid in its context")>
+Traceback (most recent call last):
+  File "C:\Users\User\Documents\PythonProjects\shedute_bot\venv\lib\site-packages\aiohttp\web.py", line 544, in run_app
+    loop.run_until_complete(main_task)
+  File "C:\Users\User\.pyenv\pyenv-win\versions\3.10.6\lib\asyncio\base_events.py", line 646, in run_until_complete
+    return future.result()
+  File "C:\Users\User\Documents\PythonProjects\shedute_bot\venv\lib\site-packages\aiohttp\web.py", line 448, in _run_app
+    await site.start()
+  File "C:\Users\User\Documents\PythonProjects\shedute_bot\venv\lib\site-packages\aiohttp\web_runner.py", line 119, in start
+    self._server = await loop.create_server(
+  File "C:\Users\User\.pyenv\pyenv-win\versions\3.10.6\lib\asyncio\base_events.py", line 1505, in create_server
+    raise OSError(err.errno, 'error while attempting '
+OSError: [Errno 10049] error while attempting to bind on address ('179.43.151.16', 8443): the requested address is not valid in its context
+2024-07-16 21:36:17,059 - ERROR - unhandled exception during asyncio.run() shutdown
+task: <Task finished name='Task-1' coro=<_run_app() done, defined at C:\Users\User\Documents\PythonProjects\shedute_bot\venv\lib\site-packages\aiohttp\web.py:303> exception=OSError(10049, "error while attempting to bind on address ('179.43.151.16', 8443): the requested address is not valid in its context")>
+Traceback (most recent call last):
+  File "C:\Users\User\Documents\PythonProjects\shedute_bot\venv\lib\site-packages\aiohttp\web.py", line 544, in run_app
+    loop.run_until_complete(main_task)
+  File "C:\Users\User\.pyenv\pyenv-win\versions\3.10.6\lib\asyncio\base_events.py", line 646, in run_until_complete
+    return future.result()
+  File "C:\Users\User\Documents\PythonProjects\shedute_bot\venv\lib\site-packages\aiohttp\web.py", line 448, in _run_app
+    await site.start()
+  File "C:\Users\User\Documents\PythonProjects\shedute_bot\venv\lib\site-packages\aiohttp\web_runner.py", line 119, in start
+    self._server = await loop.create_server(
+  File "C:\Users\User\.pyenv\pyenv-win\versions\3.10.6\lib\asyncio\base_events.py", line 1505, in create_server
+    raise OSError(err.errno, 'error while attempting '
+OSError: [Errno 10049] error while attempting to bind on address ('179.43.151.16', 8443): the requested address is not valid in its context
+2024-07-16 22:16:22,093 - WARNING - Traceback (most recent call last):
+  File "c:\Users\User\Documents\PythonProjects\shedute_bot\app\tg_bot\handle_bot.py", line 28, in <module>
+    from ..common.models import *
+ImportError: attempted relative import with no known parent package
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "c:\Users\User\Documents\PythonProjects\shedute_bot\app\tg_bot\handle_bot.py", line 33, in <module>
+    from common.common_functions import *
+  File "c:\Users\User\Documents\PythonProjects\shedute_bot\app\common\common_functions.py", line 5, in <module>
+    from ..adapters.xls_parser import read_students_excel
+ImportError: attempted relative import beyond top-level package
+
+2024-07-16 22:16:57,000 - WARNING - C:\Users\User\Documents\PythonProjects\shedute_bot\venv\Scripts\python.exe: Error while finding module specification for ' c:\\Users\\User\\Documents\\PythonProjects\\shedute_bot\\app/tg_bot/handle_bot.py' (ModuleNotFoundError: No module named ' c:\\Users\\User\\Documents\\PythonProjects\\shedute_bot\\app/tg_bot/handle_bot'). Try using ' c:\Users\User\Documents\PythonProjects\shedute_bot\app/tg_bot/handle_bot' instead of ' c:\Users\User\Documents\PythonProjects\shedute_bot\app/tg_bot/handle_bot.py' as the module name.
+
+2024-07-16 22:18:19,072 - WARNING - C:\Users\User\Documents\PythonProjects\shedute_bot\venv\Scripts\python.exe: No module named  c:\Users\User\Documents\PythonProjects\shedute_bot\app/tg_bot/handle_bot
+
+2024-07-16 22:21:51,818 - ERROR - unhandled exception during asyncio.run() shutdown
+task: <Task finished name='Task-1' coro=<_run_app() done, defined at C:\Users\User\Documents\PythonProjects\shedute_bot\venv\lib\site-packages\aiohttp\web.py:303> exception=OSError(10049, "error while attempting to bind on address ('179.43.151.16', 8443): the requested address is not valid in its context")>
+Traceback (most recent call last):
+  File "C:\Users\User\Documents\PythonProjects\shedute_bot\venv\lib\site-packages\aiohttp\web.py", line 544, in run_app
+    loop.run_until_complete(main_task)
+  File "C:\Users\User\.pyenv\pyenv-win\versions\3.10.6\lib\asyncio\base_events.py", line 646, in run_until_complete
+    return future.result()
+  File "C:\Users\User\Documents\PythonProjects\shedute_bot\venv\lib\site-packages\aiohttp\web.py", line 448, in _run_app
+    await site.start()
+  File "C:\Users\User\Documents\PythonProjects\shedute_bot\venv\lib\site-packages\aiohttp\web_runner.py", line 119, in start
+    self._server = await loop.create_server(
+  File "C:\Users\User\.pyenv\pyenv-win\versions\3.10.6\lib\asyncio\base_events.py", line 1505, in create_server
+    raise OSError(err.errno, 'error while attempting '
+OSError: [Errno 10049] error while attempting to bind on address ('179.43.151.16', 8443): the requested address is not valid in its context
+2024-07-16 22:21:51,928 - WARNING - 2024-07-16 22:21:51,818 - ERROR - unhandled exception during asyncio.run() shutdown
+task: <Task finished name='Task-1' coro=<_run_app() done, defined at C:\Users\User\Documents\PythonProjects\shedute_bot\venv\lib\site-packages\aiohttp\web.py:303> exception=OSError(10049, "error while attempting to bind on address ('179.43.151.16', 8443): the requested address is not valid in its context")>
+Traceback (most recent call last):
+  File "C:\Users\User\Documents\PythonProjects\shedute_bot\venv\lib\site-packages\aiohttp\web.py", line 544, in run_app
+    loop.run_until_complete(main_task)
+  File "C:\Users\User\.pyenv\pyenv-win\versions\3.10.6\lib\asyncio\base_events.py", line 646, in run_until_complete
+    return future.result()
+  File "C:\Users\User\Documents\PythonProjects\shedute_bot\venv\lib\site-packages\aiohttp\web.py", line 448, in _run_app
+    await site.start()
+  File "C:\Users\User\Documents\PythonProjects\shedute_bot\venv\lib\site-packages\aiohttp\web_runner.py", line 119, in start
+    self._server = await loop.create_server(
+  File "C:\Users\User\.pyenv\pyenv-win\versions\3.10.6\lib\asyncio\base_events.py", line 1505, in create_server
+    raise OSError(err.errno, 'error while attempting '
+OSError: [Errno 10049] error while attempting to bind on address ('179.43.151.16', 8443): the requested address is not valid in its context
+Traceback (most recent call last):
+  File "c:\Users\User\Documents\PythonProjects\shedute_bot\tests\run_tg_webserver.py", line 9, in <module>
+    run_tg_bot()
+  File "c:\Users\User\Documents\PythonProjects\shedute_bot\app\tg_bot\handle_bot.py", line 458, in run_tg_bot
+    web.run_app(app, host=WEB_SERVER_HOST, port=WEB_SERVER_PORT, ssl_context=context)
+  File "C:\Users\User\Documents\PythonProjects\shedute_bot\venv\lib\site-packages\aiohttp\web.py", line 544, in run_app
+    loop.run_until_complete(main_task)
+  File "C:\Users\User\.pyenv\pyenv-win\versions\3.10.6\lib\asyncio\base_events.py", line 646, in run_until_complete
+    return future.result()
+  File "C:\Users\User\Documents\PythonProjects\shedute_bot\venv\lib\site-packages\aiohttp\web.py", line 448, in _run_app
+    await site.start()
+  File "C:\Users\User\Documents\PythonProjects\shedute_bot\venv\lib\site-packages\aiohttp\web_runner.py", line 119, in start
+    self._server = await loop.create_server(
+  File "C:\Users\User\.pyenv\pyenv-win\versions\3.10.6\lib\asyncio\base_events.py", line 1505, in create_server
+    raise OSError(err.errno, 'error while attempting '
+OSError: [Errno 10049] error while attempting to bind on address ('179.43.151.16', 8443): the requested address is not valid in its context
+

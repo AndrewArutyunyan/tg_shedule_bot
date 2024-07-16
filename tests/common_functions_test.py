@@ -33,16 +33,16 @@ class TestXlsParser(unittest.TestCase):
         self.payment_currency = "RUB"
         self.student_chat_id = 252353213
         tutor_delete_query = f"DELETE FROM tutor WHERE tutor_id = {self.tutor_id}"
-        execute_query(tutor_delete_query, readonly=True)
+        execute_query(tutor_delete_query, writeonly=True)
         student_delete_query = f"DELETE FROM student WHERE student_id = {self.student_id}"
-        execute_query(student_delete_query, readonly=True)
+        execute_query(student_delete_query, writeonly=True)
         tutor_write_query = "INSERT INTO tutor(tutor_id, chat_id, full_name, phone_number, added_at) VALUES (" + \
             str(3) + ", " + \
             str(self.tutor_chat_id) + ", '" + \
             str(self.tutor_full_name) + "', '" + \
             str(self.tutor_phone_number) + "', '" + \
             str(datetime.now()) + "');"
-        execute_query(tutor_write_query, readonly=True)
+        execute_query(tutor_write_query, writeonly=True)
         tutor_read_query = f"SELECT tutor_id FROM tutor WHERE chat_id = {self.tutor_chat_id}"
         tutor_id = execute_query(tutor_read_query)
         student_write_query = "INSERT INTO student(student_id, tutor_id, chat_id, unique_id, full_name, payment_amount, payment_currency, added_at) VALUES (" + \
@@ -54,7 +54,7 @@ class TestXlsParser(unittest.TestCase):
             str(self.payment_amount) + ", '" + \
             str(self.payment_currency) + "', '" + \
             str(datetime.now()) + "');"
-        execute_query(student_write_query, readonly=True)
+        execute_query(student_write_query, writeonly=True)
 
         # Restore the original log level after the tests
         logging.disable(original_log_level)
@@ -140,7 +140,7 @@ class TestXlsParser(unittest.TestCase):
         test_state = "TEST"
         set_chat_state(tg_chat_id=id, state=test_state)
         db_state = get_chat_state(tg_chat_id=id)
-        self.assertEqual(test_state, db_state[0])
+        self.assertEqual(test_state[0], db_state[0])
 
 
 if __name__ == '__main__':

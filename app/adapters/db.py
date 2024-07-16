@@ -26,7 +26,7 @@ def load_config(filename, section='postgresql')->dict:
     return config
 
 
-def execute_query(query, config=None, readonly=False):
+def execute_query(query, config=None, writeonly=False):
     """ Run query on the PostgreSQL database server, return result """
     result = None
     conf_file = 'config/database.ini'
@@ -41,7 +41,7 @@ def execute_query(query, config=None, readonly=False):
             logger.debug('Connected to the PostgreSQL server.')
             cursor_obj = conn.cursor()
             cursor_obj.execute(query)
-            if not readonly:
+            if not writeonly:
                 result = cursor_obj.fetchall()
             logger.debug(query)
 

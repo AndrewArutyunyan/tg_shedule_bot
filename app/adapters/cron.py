@@ -30,6 +30,9 @@ def add_cron_job(cron_period:str, contact_id:int, message:str, notification_id:i
                     comment=str(notification_id))
     job.setall(cron_period)
     job.enable()
+    logger.debug("Adding a cron job, command: '"+\
+                f'{venv_path} {script_path} {contact_id} "{message}" >> {log_path}  2>&1'+\
+                " time period: " + cron_period)
     cron.write()
     logger.debug("Cron job added")
 
@@ -92,8 +95,8 @@ def list_cron_jobs(contact_id:int=None, notification_id:Union[int,List[int]]=Non
             for job in cron.find_comment(str(job_id)):
                 command = job.command.split(" ")
                 contact_id_cron = int(command[2])
-                notification_id_cron = int(command[-1])
-                job_desc = " ".join(command[3:-5])[1:-1]
+                notification_id_cron = job.comment
+                job_desc = " ".join(command[3:-4])[1:-1]
                 out_jobs.update({notification_id_cron: job_desc})
                 
     return out_jobs
